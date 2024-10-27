@@ -69,6 +69,8 @@
 #define SDL_DYNAMIC_API 0 /* devkitARM doesn't support dynamic linking */
 #elif defined(DYNAPI_NEEDS_DLOPEN) && !defined(HAVE_DLOPEN)
 #define SDL_DYNAMIC_API 0 /* we need dlopen(), but don't have it.... */
+#elif defined(__WIN9X__)
+#define SDL_DYNAMIC_API 0 /* Windows 9x is not supported upstream, and since nobody will be running Steam on it anyway, updating will always involve replacing the DLL. */
 #endif
 
 /* everyone else. This is where we turn on the API if nothing forced it off. */
