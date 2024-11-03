@@ -90,7 +90,7 @@ typedef enum SDL_ThreadPriority {
 typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
 
 
-#if (defined(__WIN32__) || defined(__GDK__)) && !defined(__WINRT__)
+#if (defined(__WIN32__) || defined(__GDK__)) && !defined(__WINRT__) && !defined(__WIN9X__)
 /**
  *  \file SDL_thread.h
  *
@@ -110,6 +110,8 @@ typedef int (SDLCALL * SDL_ThreadFunction) (void *data);
  *  So, in short:
  *  Always use the _beginthread() and _endthread() of the calling runtime
  *  library!
+ *  (Except on Windows 9x, where want to reimplement these functions ourselves
+ *  to avoid the CRT's usage of unavailable system APIs.)
  */
 #define SDL_PASSED_BEGINTHREAD_ENDTHREAD
 

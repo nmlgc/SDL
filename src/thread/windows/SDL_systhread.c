@@ -78,8 +78,29 @@ int SDL_SYS_CreateThread(SDL_Thread *thread)
 #else
 int SDL_SYS_CreateThread(SDL_Thread *thread)
 {
+#ifdef __WIN9X__
+    /**
+     * The Visual Studio CRT versions of _beginthreadex and _endthreadex do
+     * exactly two things of value:
+     *
+     * 1) Incrementing the reference count of the module that contains the
+     *    thread function, using GetModuleHandleExW()
+     * 2) Ensuring that the new thread initializes and shuts down the Windows
+     *    RT runtime, using RoInitialize() and RoUninitialize(). To figure out
+     *    whether this is necessary, the CRT reaches directly through the NT
+     *    TEB into the NT PEB to read a process flag.
+     *
+     * Win9x predates the Windows RT runtime and the NT kernel, and we would
+     * have to reimplement GetModuleHandleExW(). The latter would make sense,
+     * but who in their right mind tries to free an executing module anyway,
+     * right?
+     */
+    pfnSDL_CurrentBeginThread pfnBeginThread = NULL;
+    pfnSDL_CurrentEndThread pfnEndThread = NULL;
+#else
     pfnSDL_CurrentBeginThread pfnBeginThread = (pfnSDL_CurrentBeginThread)_beginthreadex;
     pfnSDL_CurrentEndThread pfnEndThread = (pfnSDL_CurrentEndThread)_endthreadex;
+#endif /* __WIN9x__ */
 #endif /* SDL_PASSED_BEGINTHREAD_ENDTHREAD */
     const DWORD flags = thread->stacksize ? STACK_SIZE_PARAM_IS_A_RESERVATION : 0;
 

@@ -10,7 +10,8 @@ emulators, and popular games including Valve's award winning catalog
 and many Humble Bundle games.
 
 This fork adds WIP support for Windows 9x, which can be enabled by defining the
-`__WIN9X__` macro on SDL's build command line.
+`__WIN9X__` macro on SDL's build command line. If you use `SDL_Thread`s, it
+also must be defined prior to #including `SDL_thread.h`.
 
 More extensive documentation is available in the docs directory, starting
 with README.md
