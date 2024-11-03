@@ -4,7 +4,9 @@ designed to make it easy to write multi-media software, such as games
 and emulators.
 
 This fork adds WIP support for Windows 9x, which can be enabled by
-defining the `__WIN9X__` macro on SDL's build command line.
+defining the `__WIN9X__` macro on SDL's build command line. If you
+use `SDL_Thread`s, it also must be defined prior to #including
+`SDL_thread.h`.
 
 You can find the latest release and additional information at:
 https://www.libsdl.org/

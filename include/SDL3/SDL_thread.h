@@ -292,7 +292,7 @@ extern SDL_DECLSPEC SDL_Thread * SDLCALL SDL_CreateThreadWithProperties(SDL_Prop
 
 /* The real implementation, hidden from the wiki, so it can show this as real functions that don't have macro magic. */
 #ifndef SDL_WIKI_DOCUMENTATION_SECTION
-#  if defined(SDL_PLATFORM_WINDOWS)
+#  if defined(SDL_PLATFORM_WINDOWS) && !defined(__WIN9X__)
 #    ifndef SDL_BeginThreadFunction
 #      define SDL_BeginThreadFunction _beginthreadex
 #    endif
@@ -302,7 +302,7 @@ extern SDL_DECLSPEC SDL_Thread * SDLCALL SDL_CreateThreadWithProperties(SDL_Prop
 #  endif
 #endif
 
-/* currently no other platforms than Windows use _beginthreadex/_endthreadex things. */
+/* currently no other platforms than modern Windows use _beginthreadex/_endthreadex things. */
 #ifndef SDL_WIKI_DOCUMENTATION_SECTION
 #  ifndef SDL_BeginThreadFunction
 #    define SDL_BeginThreadFunction NULL
