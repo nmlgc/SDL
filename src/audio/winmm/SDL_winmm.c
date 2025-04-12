@@ -79,7 +79,7 @@ static void DetectWave##typ##Devs(void) { \
     UINT i; \
     SDL_zero(spec); \
     for (i = 0; i < devcount; i++) { \
-        if (wave##typ##GetDevCaps(i,(LP##capstyp##W)&caps,sizeof(caps))==MMSYSERR_NOERROR) { \
+        if (wave##typ##GetDevCapsW(i,(LP##capstyp##W)&caps,sizeof(caps))==MMSYSERR_NOERROR) { \
             char *name = WIN_LookupAudioDeviceName(caps.szPname,&caps.NameGuid); \
             if (name != NULL) { \
                 /* Note that freq/format are not filled in, as this information \
@@ -138,7 +138,7 @@ static int SetMMerror(const char *function, MMRESULT code)
     SDL_snprintf(errbuf, SDL_arraysize(errbuf), "%s: ", function);
     len = SDL_static_cast(int, SDL_strlen(errbuf));
 
-    waveOutGetErrorText(code, werrbuf, MAXERRORLENGTH - len);
+    waveOutGetErrorTextW(code, werrbuf, MAXERRORLENGTH - len);
     WideCharToMultiByte(CP_ACP, 0, werrbuf, -1, errbuf + len,
                         MAXERRORLENGTH - len, NULL, NULL);
 

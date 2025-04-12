@@ -286,7 +286,7 @@ static SDL_bool QueryDeviceName(LPDIRECTINPUTDEVICE8 device, char **device_name)
         return SDL_FALSE;
     }
 
-    *device_name = WIN_StringToUTF8(dipstr.wsz);
+    *device_name = WIN_StringToUTF8W(dipstr.wsz);
 
     return SDL_TRUE;
 }

@@ -1055,7 +1055,7 @@ void *WIN_GetWindowICCProfile(_THIS, SDL_Window *window, size_t *size)
     char *filename_utf8;
     void *iccProfileData = NULL;
 
-    filename_utf8 = WIN_StringToUTF8(data->ICMFileName);
+    filename_utf8 = WIN_StringToUTF8W(data->ICMFileName);
     if (filename_utf8) {
         iccProfileData = SDL_LoadFile(filename_utf8, size);
         if (!iccProfileData) {
