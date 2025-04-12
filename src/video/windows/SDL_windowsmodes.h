@@ -25,7 +25,7 @@
 
 typedef struct
 {
-    WCHAR DeviceName[32];
+    TCHAR DeviceName[32];
     HMONITOR MonitorHandle;
     SDL_bool IsValid;
     SDL_Rect bounds;
@@ -33,7 +33,7 @@ typedef struct
 
 typedef struct
 {
-    DEVMODEW DeviceMode;
+    DEVMODE DeviceMode;
 } SDL_DisplayModeData;
 
 extern int WIN_InitModes(_THIS);

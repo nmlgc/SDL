@@ -553,7 +553,7 @@ int SDL_Direct3D9GetAdapterIndex(int displayIndex)
             SDL_SetError("Invalid display index");
             adapterIndex = -1; /* make sure we return something invalid */
         } else {
-            char *displayName = WIN_StringToUTF8W(pData->DeviceName);
+            char *displayName = WIN_StringToUTF8(pData->DeviceName);
             unsigned int count = IDirect3D9_GetAdapterCount(pD3D);
             unsigned int i;
             for (i = 0; i < count; i++) {
@@ -655,7 +655,7 @@ SDL_bool SDL_DXGIGetOutputInfo(int displayIndex, int *adapterIndex, int *outputI
         return SDL_FALSE;
     }
 
-    displayName = WIN_StringToUTF8W(pData->DeviceName);
+    displayName = WIN_StringToUTF8(pData->DeviceName);
     nAdapter = 0;
     while (*adapterIndex == -1 && SUCCEEDED(IDXGIFactory_EnumAdapters(pDXGIFactory, nAdapter, &pDXGIAdapter))) {
         nOutput = 0;

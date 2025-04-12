@@ -33,7 +33,7 @@
 /* #define DEBUG_MODES */
 /* #define HIGHDPI_DEBUG_VERBOSE */
 
-static void WIN_UpdateDisplayMode(_THIS, LPCWSTR deviceName, DWORD index, SDL_DisplayMode *mode)
+static void WIN_UpdateDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode *mode)
 {
     SDL_DisplayModeData *data = (SDL_DisplayModeData *)mode->driverdata;
     HDC hdc;
@@ -43,7 +43,7 @@ static void WIN_UpdateDisplayMode(_THIS, LPCWSTR deviceName, DWORD index, SDL_Di
          DM_DISPLAYFLAGS);
 
     /* NOLINTNEXTLINE(bugprone-assignment-in-if-condition): No simple way to extract the assignment */
-    if (index == ENUM_CURRENT_SETTINGS && (hdc = CreateDCW(deviceName, NULL, NULL, NULL)) != NULL) {
+    if (index == ENUM_CURRENT_SETTINGS && (hdc = CreateDC(deviceName, NULL, NULL, NULL)) != NULL) {
         char bmi_data[sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD)];
         LPBITMAPINFO bmi;
         HBITMAP hbm;
@@ -118,7 +118,7 @@ static void WIN_UpdateDisplayMode(_THIS, LPCWSTR deviceName, DWORD index, SDL_Di
     }
 }
 
-static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODEW *mode)
+static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODE *mode)
 {
     int width = mode->dmPelsWidth;
     int height = mode->dmPelsHeight;
@@ -159,14 +159,14 @@ static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODEW *mode)
     }
 }
 
-static SDL_bool WIN_GetDisplayMode(_THIS, LPCWSTR deviceName, DWORD index, SDL_DisplayMode *mode, SDL_DisplayOrientation *orientation)
+static SDL_bool WIN_GetDisplayMode(_THIS, LPCTSTR deviceName, DWORD index, SDL_DisplayMode *mode, SDL_DisplayOrientation *orientation)
 {
     SDL_DisplayModeData *data;
-    DEVMODEW devmode;
+    DEVMODE devmode;
 
     devmode.dmSize = sizeof(devmode);
     devmode.dmDriverExtra = 0;
-    if (!EnumDisplaySettingsW(deviceName, index, &devmode)) {
+    if (!EnumDisplaySettings(deviceName, index, &devmode)) {
         return SDL_FALSE;
     }
 
@@ -272,7 +272,7 @@ WIN_GetDisplayNameVista_failed:
     return NULL;
 }
 
-static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEXW *info, int *display_index, SDL_bool send_event)
+static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEX *info, int *display_index, SDL_bool send_event)
 {
     int i, index = *display_index;
     SDL_VideoDisplay display;
@@ -293,7 +293,11 @@ static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEXW *info,
     // removed
     for (i = 0; i < _this->num_displays; ++i) {
         SDL_DisplayData *driverdata = (SDL_DisplayData *)_this->displays[i].driverdata;
+#ifdef UNICODE
         if (SDL_wcscmp(driverdata->DeviceName, info->szDevice) == 0) {
+#else
+        if (SDL_strcmp(driverdata->DeviceName, info->szDevice) == 0) {
+#endif
             SDL_bool moved = (index != i);
 
             if (index >= _this->num_displays) {
@@ -338,13 +342,15 @@ static void WIN_AddDisplay(_THIS, HMONITOR hMonitor, const MONITORINFOEXW *info,
     displaydata->IsValid = SDL_TRUE;
 
     SDL_zero(display);
+#if (_WIN32_WINNT >= 0x0600)
     display.name = WIN_GetDisplayNameVista(_this->driverdata, info->szDevice);
+#endif
     if (!display.name) {
-        DISPLAY_DEVICEW device;
+        DISPLAY_DEVICE device;
         SDL_zero(device);
         device.cb = sizeof(device);
-        if (EnumDisplayDevicesW(info->szDevice, 0, &device, 0)) {
-            display.name = WIN_StringToUTF8W(device.DeviceString);
+        if (EnumDisplayDevices(info->szDevice, 0, &device, 0)) {
+            display.name = WIN_StringToUTF8(device.DeviceString);
         }
     }
 
@@ -375,12 +381,12 @@ static BOOL CALLBACK WIN_AddDisplaysCallback(HMONITOR hMonitor,
                                              LPARAM dwData)
 {
     WIN_AddDisplaysData *data = (WIN_AddDisplaysData *)dwData;
-    MONITORINFOEXW info;
+    MONITORINFOEX info;
 
     SDL_zero(info);
     info.cbSize = sizeof(info);
 
-    if (GetMonitorInfoW(hMonitor, (LPMONITORINFO)&info) != 0) {
+    if (GetMonitorInfo(hMonitor, (LPMONITORINFO)&info) != 0) {
         const SDL_bool is_primary = ((info.dwFlags & MONITORINFOF_PRIMARY) == MONITORINFOF_PRIMARY);
 
         if (is_primary == data->want_primary) {
@@ -755,12 +761,12 @@ int WIN_SetDisplayMode(_THIS, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
 #ifdef DEBUG_MODES
         SDL_Log("WIN_SetDisplayMode: resetting to original resolution");
 #endif
-        status = ChangeDisplaySettingsExW(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
+        status = ChangeDisplaySettingsEx(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
     } else {
 #ifdef DEBUG_MODES
         SDL_Log("WIN_SetDisplayMode: changing to %dx%d pixels", data->DeviceMode.dmPelsWidth, data->DeviceMode.dmPelsHeight);
 #endif
-        status = ChangeDisplaySettingsExW(displaydata->DeviceName, &data->DeviceMode, NULL, CDS_FULLSCREEN, NULL);
+        status = ChangeDisplaySettingsEx(displaydata->DeviceName, &data->DeviceMode, NULL, CDS_FULLSCREEN, NULL);
     }
     if (status != DISP_CHANGE_SUCCESSFUL) {
         const char *reason = "Unknown reason";
@@ -786,7 +792,7 @@ int WIN_SetDisplayMode(_THIS, SDL_VideoDisplay *display, SDL_DisplayMode *mode)
     WIN_LogMonitor(_this, displaydata->MonitorHandle);
 #endif
 
-    EnumDisplaySettingsW(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
+    EnumDisplaySettings(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
     WIN_UpdateDisplayMode(_this, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
     return 0;
 }
