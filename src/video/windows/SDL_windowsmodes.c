@@ -41,7 +41,7 @@
 // #define DEBUG_MODES
 // #define HIGHDPI_DEBUG_VERBOSE
 
-static void WIN_UpdateDisplayMode(SDL_VideoDevice *_this, LPCWSTR deviceName, DWORD index, SDL_DisplayMode *mode)
+static void WIN_UpdateDisplayMode(SDL_VideoDevice *_this, LPCTSTR deviceName, DWORD index, SDL_DisplayMode *mode)
 {
     SDL_DisplayModeData *data = (SDL_DisplayModeData *)mode->internal;
     HDC hdc;
@@ -49,7 +49,7 @@ static void WIN_UpdateDisplayMode(SDL_VideoDevice *_this, LPCWSTR deviceName, DW
     data->DeviceMode.dmFields = (DM_BITSPERPEL | DM_PELSWIDTH | DM_PELSHEIGHT | DM_DISPLAYFREQUENCY | DM_DISPLAYFLAGS);
 
     // NOLINTNEXTLINE(bugprone-assignment-in-if-condition): No simple way to extract the assignment
-    if (index == ENUM_CURRENT_SETTINGS && (hdc = CreateDCW(deviceName, NULL, NULL, NULL)) != NULL) {
+    if (index == ENUM_CURRENT_SETTINGS && (hdc = CreateDC(deviceName, NULL, NULL, NULL)) != NULL) {
         char bmi_data[sizeof(BITMAPINFOHEADER) + 256 * sizeof(RGBQUAD)];
         LPBITMAPINFO bmi;
         HBITMAP hbm;
@@ -114,7 +114,7 @@ static void WIN_UpdateDisplayMode(SDL_VideoDevice *_this, LPCWSTR deviceName, DW
     }
 }
 
-static void *WIN_GetDXGIOutput(SDL_VideoDevice *_this, const WCHAR *DeviceName)
+static void *WIN_GetDXGIOutput(SDL_VideoDevice *_this, const TCHAR *DeviceName)
 {
     void *result = NULL;
 
@@ -161,7 +161,7 @@ static void WIN_ReleaseDXGIOutput(void *dxgi_output)
 #endif
 }
 
-static SDL_DisplayOrientation WIN_GetNaturalOrientation(DEVMODEW *mode)
+static SDL_DisplayOrientation WIN_GetNaturalOrientation(DEVMODE *mode)
 {
     int width = mode->dmPelsWidth;
     int height = mode->dmPelsHeight;
@@ -180,7 +180,7 @@ static SDL_DisplayOrientation WIN_GetNaturalOrientation(DEVMODEW *mode)
     }
 }
 
-static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODEW *mode)
+static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODE *mode)
 {
     if (WIN_GetNaturalOrientation(mode) == SDL_ORIENTATION_LANDSCAPE) {
         switch (mode->dmDisplayOrientation) {
@@ -211,7 +211,7 @@ static SDL_DisplayOrientation WIN_GetDisplayOrientation(DEVMODEW *mode)
     }
 }
 
-static void WIN_GetRefreshRate(void *dxgi_output, DEVMODEW *mode, int *numerator, int *denominator)
+static void WIN_GetRefreshRate(void *dxgi_output, DEVMODE *mode, int *numerator, int *denominator)
 {
     // We're not currently using DXGI to query display modes, so fake NTSC timings
     switch (mode->dmDisplayFrequency) {
@@ -274,14 +274,14 @@ static float WIN_GetContentScale(SDL_VideoDevice *_this, HMONITOR hMonitor)
     return dpi / (float)USER_DEFAULT_SCREEN_DPI;
 }
 
-static bool WIN_GetDisplayMode(SDL_VideoDevice *_this, void *dxgi_output, HMONITOR hMonitor, LPCWSTR deviceName, DWORD index, SDL_DisplayMode *mode, SDL_DisplayOrientation *natural_orientation, SDL_DisplayOrientation *current_orientation)
+static bool WIN_GetDisplayMode(SDL_VideoDevice *_this, void *dxgi_output, HMONITOR hMonitor, LPCTSTR deviceName, DWORD index, SDL_DisplayMode *mode, SDL_DisplayOrientation *natural_orientation, SDL_DisplayOrientation *current_orientation)
 {
     SDL_DisplayModeData *data;
-    DEVMODEW devmode;
+    DEVMODE devmode;
 
     devmode.dmSize = sizeof(devmode);
     devmode.dmDriverExtra = 0;
-    if (!EnumDisplaySettingsW(deviceName, index, &devmode)) {
+    if (!EnumDisplaySettings(deviceName, index, &devmode)) {
         return false;
     }
 
@@ -312,7 +312,7 @@ static bool WIN_GetDisplayMode(SDL_VideoDevice *_this, void *dxgi_output, HMONIT
     return true;
 }
 
-static char *WIN_GetDisplayNameVista(SDL_VideoData *videodata, const WCHAR *deviceName)
+static char *WIN_GetDisplayNameVista(SDL_VideoData *videodata, const TCHAR *deviceName)
 {
     DISPLAYCONFIG_PATH_INFO *paths = NULL;
     DISPLAYCONFIG_MODE_INFO *modes = NULL;
@@ -552,7 +552,7 @@ static void WIN_GetHDRProperties(SDL_VideoDevice *_this, HMONITOR hMonitor, SDL_
 }
 #endif // HAVE_DXGI1_6_H
 
-static void WIN_AddDisplay(SDL_VideoDevice *_this, HMONITOR hMonitor, const MONITORINFOEXW *info, int *display_index)
+static void WIN_AddDisplay(SDL_VideoDevice *_this, HMONITOR hMonitor, const MONITORINFOEX *info, int *display_index)
 {
     int i, index = *display_index;
     SDL_VideoDisplay display;
@@ -579,7 +579,11 @@ static void WIN_AddDisplay(SDL_VideoDevice *_this, HMONITOR hMonitor, const MONI
     // removed
     for (i = 0; i < _this->num_displays; ++i) {
         SDL_DisplayData *internal = _this->displays[i]->internal;
+#ifdef UNICODE
         if (SDL_wcscmp(internal->DeviceName, info->szDevice) == 0) {
+#else
+        if (SDL_strcmp(internal->DeviceName, info->szDevice) == 0) {
+#endif
             bool moved = (index != i);
             bool changed_bounds = false;
 
@@ -642,13 +646,15 @@ static void WIN_AddDisplay(SDL_VideoDevice *_this, HMONITOR hMonitor, const MONI
     displaydata->state = DisplayAdded;
 
     SDL_zero(display);
+#if (_WIN32_WINNT >= 0x0600)
     display.name = WIN_GetDisplayNameVista(_this->internal, info->szDevice);
+#endif
     if (!display.name) {
-        DISPLAY_DEVICEW device;
+        DISPLAY_DEVICE device;
         SDL_zero(device);
         device.cb = sizeof(device);
-        if (EnumDisplayDevicesW(info->szDevice, 0, &device, 0)) {
-            display.name = WIN_StringToUTF8W(device.DeviceString);
+        if (EnumDisplayDevices(info->szDevice, 0, &device, 0)) {
+            display.name = WIN_StringToUTF8(device.DeviceString);
         }
     }
 
@@ -690,12 +696,12 @@ static BOOL CALLBACK WIN_AddDisplaysCallback(HMONITOR hMonitor,
                                              LPARAM dwData)
 {
     WIN_AddDisplaysData *data = (WIN_AddDisplaysData *)dwData;
-    MONITORINFOEXW info;
+    MONITORINFOEX info;
 
     SDL_zero(info);
     info.cbSize = sizeof(info);
 
-    if (GetMonitorInfoW(hMonitor, (LPMONITORINFO)&info) != 0) {
+    if (GetMonitorInfo(hMonitor, (LPMONITORINFO)&info) != 0) {
         const bool is_primary = ((info.dwFlags & MONITORINFOF_PRIMARY) == MONITORINFOF_PRIMARY);
 
         if (is_primary == data->want_primary) {
@@ -862,12 +868,12 @@ bool WIN_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_D
 #ifdef DEBUG_MODES
         SDL_Log("WIN_SetDisplayMode: resetting to original resolution");
 #endif
-        status = ChangeDisplaySettingsExW(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
+        status = ChangeDisplaySettingsEx(displaydata->DeviceName, NULL, NULL, CDS_FULLSCREEN, NULL);
     } else {
 #ifdef DEBUG_MODES
         SDL_Log("WIN_SetDisplayMode: changing to %dx%d pixels", data->DeviceMode.dmPelsWidth, data->DeviceMode.dmPelsHeight);
 #endif
-        status = ChangeDisplaySettingsExW(displaydata->DeviceName, &data->DeviceMode, NULL, CDS_FULLSCREEN, NULL);
+        status = ChangeDisplaySettingsEx(displaydata->DeviceName, &data->DeviceMode, NULL, CDS_FULLSCREEN, NULL);
     }
     if (status != DISP_CHANGE_SUCCESSFUL) {
         const char *reason = "Unknown reason";
@@ -893,7 +899,7 @@ bool WIN_SetDisplayMode(SDL_VideoDevice *_this, SDL_VideoDisplay *display, SDL_D
     WIN_LogMonitor(_this, displaydata->MonitorHandle);
 #endif
 
-    EnumDisplaySettingsW(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
+    EnumDisplaySettings(displaydata->DeviceName, ENUM_CURRENT_SETTINGS, &data->DeviceMode);
     WIN_UpdateDisplayMode(_this, displaydata->DeviceName, ENUM_CURRENT_SETTINGS, mode);
     return true;
 }

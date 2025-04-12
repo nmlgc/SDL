@@ -1383,7 +1383,7 @@ void WIN_UpdateWindowICCProfile(SDL_Window *window, bool send_event)
     SDL_DisplayData *displaydata = SDL_GetDisplayDriverDataForWindow(window);
 
     if (displaydata) {
-        HDC hdc = CreateDCW(displaydata->DeviceName, NULL, NULL, NULL);
+        HDC hdc = CreateDC(displaydata->DeviceName, NULL, NULL, NULL);
         if (hdc) {
             WCHAR fileName[MAX_PATH];
             DWORD fileNameSize = SDL_arraysize(fileName);

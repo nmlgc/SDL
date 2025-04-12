@@ -33,7 +33,7 @@ typedef enum
 
 struct SDL_DisplayData
 {
-    WCHAR DeviceName[32];
+    TCHAR DeviceName[32];
     HMONITOR MonitorHandle;
     WIN_DisplayState state;
     SDL_Rect bounds;
@@ -41,7 +41,7 @@ struct SDL_DisplayData
 
 struct SDL_DisplayModeData
 {
-    DEVMODEW DeviceMode;
+    DEVMODE DeviceMode;
 };
 
 extern bool WIN_InitModes(SDL_VideoDevice *_this);
