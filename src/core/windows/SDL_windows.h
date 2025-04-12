@@ -31,7 +31,9 @@
 #ifndef STRICT
 #define STRICT 1
 #endif
-#ifndef UNICODE
+#if defined(__WIN9X__)
+#undef UNICODE
+#elif !defined(UNICODE)
 #define UNICODE 1
 #endif
 #undef WINVER
