@@ -50,6 +50,12 @@
 #include <sdkddkver.h>
 #endif
 
+#ifdef __WIN9X__
+#undef _WIN32_MAXVER
+#undef _WIN32_WINNT
+#define _WIN32_WINNT 0x0400
+#endif
+
 /* This is a set of defines to configure the SDL features */
 
 #if !defined(HAVE_STDINT_H) && !defined(_STDINT_H_)

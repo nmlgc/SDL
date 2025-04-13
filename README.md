@@ -9,6 +9,9 @@ hardware via OpenGL and Direct3D. It is used by video playback software,
 emulators, and popular games including Valve's award winning catalog
 and many Humble Bundle games.
 
+This fork adds WIP support for Windows 9x, which can be enabled by defining the
+`__WIN9X__` macro on SDL's build command line.
+
 More extensive documentation is available in the docs directory, starting
 with README.md
 
