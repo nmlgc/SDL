@@ -127,8 +127,8 @@ typedef unsigned int uintptr_t;
 #define HAVE_STDARG_H 1
 #define HAVE_STDDEF_H 1
 
-/* This can be disabled to avoid C runtime dependencies and manifest requirements */
-#ifndef HAVE_LIBC
+/* This can be disabled to avoid C runtime dependencies and manifest requirements, but must be disabled on Windows 9x */
+#if !defined(HAVE_LIBC) && (_WIN32_WINNT >= 0x0501)
 #define HAVE_LIBC 1
 #endif
 
