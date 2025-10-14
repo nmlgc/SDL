@@ -327,7 +327,7 @@ void *WIN_GetClipboardData(SDL_VideoDevice *_this, const char *mime_type, size_t
                 if (hMem) {
                     str = (LPTSTR)GlobalLock(hMem);
                     if (str) {
-                        text = WIN_StringToUTF8W(str);
+                        text = WIN_StringToUTF8(str);
                         GlobalUnlock(hMem);
                     } else {
                         WIN_SetError("Couldn't lock clipboard data");
