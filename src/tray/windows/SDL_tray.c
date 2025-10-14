@@ -58,7 +58,7 @@ struct SDL_TrayEntry {
 };
 
 struct SDL_Tray {
-    NOTIFYICONDATAW nid;
+    NOTIFYICONDATA nid;
     HWND hwnd;
     HICON icon;
     SDL_TrayMenu *menu;
@@ -113,8 +113,8 @@ LRESULT CALLBACK TrayWindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lPar
         s_taskbarRestart = RegisterWindowMessage(TEXT("TaskbarCreated"));
     }
     if (uMsg == s_taskbarRestart) {
-        Shell_NotifyIconW(NIM_ADD, &tray->nid);
-        Shell_NotifyIconW(NIM_SETVERSION, &tray->nid);
+        Shell_NotifyIcon(NIM_ADD, &tray->nid);
+        Shell_NotifyIcon(NIM_SETVERSION, &tray->nid);
     }
 
     switch (uMsg) {
@@ -234,7 +234,7 @@ static void SDL_PropTrayCleanupCb(void *userdata, void *cls)
     }
 }
 
-static bool SDL_RegisterTrayClass(LPCWSTR className)
+static bool SDL_RegisterTrayClass(LPCTSTR className)
 {
     SDL_PropertiesID props = SDL_GetGlobalProperties();
     if (!props) {
@@ -291,14 +291,18 @@ SDL_Tray *SDL_CreateTray(SDL_Surface *icon, const char *tooltip)
     WIN_UpdateDarkModeForHWND(tray->hwnd);
 
     SDL_zero(tray->nid);
-    tray->nid.cbSize = sizeof(NOTIFYICONDATAW);
+    tray->nid.cbSize = sizeof(NOTIFYICONDATA);
     tray->nid.hWnd = tray->hwnd;
     tray->nid.uID = (UINT) get_next_id();
     tray->nid.uFlags = NIF_ICON | NIF_MESSAGE | NIF_TIP | NIF_SHOWTIP;
     tray->nid.uCallbackMessage = WM_TRAYICON;
     tray->nid.uVersion = NOTIFYICON_VERSION_4;
-    wchar_t *tooltipw = WIN_UTF8ToStringW(tooltip);
+    TCHAR *tooltipw = WIN_UTF8ToString(tooltip);
+#if UNICODE
     SDL_wcslcpy(tray->nid.szTip, tooltipw, sizeof(tray->nid.szTip) / sizeof(*tray->nid.szTip));
+#else
+    SDL_strlcpy(tray->nid.szTip, tooltipw, sizeof(tray->nid.szTip) / sizeof(*tray->nid.szTip));
+#endif
     SDL_free(tooltipw);
 
     if (icon) {
@@ -314,8 +318,8 @@ SDL_Tray *SDL_CreateTray(SDL_Surface *icon, const char *tooltip)
         tray->icon = tray->nid.hIcon;
     }
 
-    Shell_NotifyIconW(NIM_ADD, &tray->nid);
-    Shell_NotifyIconW(NIM_SETVERSION, &tray->nid);
+    Shell_NotifyIcon(NIM_ADD, &tray->nid);
+    Shell_NotifyIcon(NIM_SETVERSION, &tray->nid);
 
     SetWindowLongPtr(tray->hwnd, GWLP_USERDATA, (LONG_PTR) tray);
 
@@ -347,7 +351,7 @@ void SDL_SetTrayIcon(SDL_Tray *tray, SDL_Surface *icon)
         tray->icon = tray->nid.hIcon;
     }
 
-    Shell_NotifyIconW(NIM_MODIFY, &tray->nid);
+    Shell_NotifyIcon(NIM_MODIFY, &tray->nid);
 }
 
 void SDL_SetTrayTooltip(SDL_Tray *tray, const char *tooltip)
@@ -357,14 +361,18 @@ void SDL_SetTrayTooltip(SDL_Tray *tray, const char *tooltip)
     }
 
     if (tooltip) {
-        wchar_t *tooltipw = WIN_UTF8ToStringW(tooltip);
+        TCHAR *tooltipw = WIN_UTF8ToString(tooltip);
+#if UNICODE
         SDL_wcslcpy(tray->nid.szTip, tooltipw, sizeof(tray->nid.szTip) / sizeof(*tray->nid.szTip));
+#else
+        SDL_strlcpy(tray->nid.szTip, tooltipw, sizeof(tray->nid.szTip) / sizeof(*tray->nid.szTip));
+#endif
         SDL_free(tooltipw);
     } else {
         tray->nid.szTip[0] = '\0';
     }
 
-    Shell_NotifyIconW(NIM_MODIFY, &tray->nid);
+    Shell_NotifyIcon(NIM_MODIFY, &tray->nid);
 }
 
 SDL_TrayMenu *SDL_CreateTrayMenu(SDL_Tray *tray)
@@ -727,7 +735,7 @@ void SDL_DestroyTray(SDL_Tray *tray)
 
     SDL_UnregisterTray(tray);
 
-    Shell_NotifyIconW(NIM_DELETE, &tray->nid);
+    Shell_NotifyIcon(NIM_DELETE, &tray->nid);
 
     if (tray->menu) {
         DestroySDLMenu(tray->menu);
