@@ -95,7 +95,7 @@ static bool is_batch_file_path(const char *path) {
     return false;
 }
 
-static bool join_arguments(const char * const *args, LPWSTR *args_out)
+static bool join_arguments(const char * const *args, LPTSTR *args_out)
 {
     size_t len;
     int i;
@@ -202,7 +202,11 @@ static bool join_arguments(const char * const *args, LPWSTR *args_out)
     SDL_assert(i_out == len);
     result[len - 1] = '\0';
 
+#ifdef UNICODE
     *args_out = (LPWSTR)SDL_iconv_string("UTF-16LE", "UTF-8", (const char *)result, len);
+#else
+    *args_out = SDL_iconv_string("ASCII", "UTF-8", (const char *)result, len);
+#endif
     SDL_free(result);
     if (!args_out) {
         return false;
@@ -210,7 +214,7 @@ static bool join_arguments(const char * const *args, LPWSTR *args_out)
     return true;
 }
 
-static bool join_env(char **env, LPWSTR *env_out)
+static bool join_env(char **env, LPTSTR *env_out)
 {
     size_t len;
     char **var;
@@ -234,7 +238,11 @@ static bool join_env(char **env, LPWSTR *env_out)
     }
     result[len] = '\0';
 
+#ifdef UNICODE
     *env_out = (LPWSTR)SDL_iconv_string("UTF-16LE", "UTF-8", (const char *)result, len);
+#else
+    *env_out = SDL_iconv_string("ASCII", "UTF-8", (const char *)result, len);
+#endif
     SDL_free(result);
     if (!*env_out) {
         return false;
@@ -254,10 +262,10 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
     SDL_ProcessIO stderr_option = (SDL_ProcessIO)SDL_GetNumberProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER, SDL_PROCESS_STDIO_INHERITED);
     bool redirect_stderr = SDL_GetBooleanProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_TO_STDOUT_BOOLEAN, false) &&
                            !SDL_HasProperty(props, SDL_PROP_PROCESS_CREATE_STDERR_NUMBER);
-    LPWSTR createprocess_cmdline = NULL;
-    LPWSTR createprocess_env = NULL;
-    LPWSTR createprocess_cwd = NULL;
-    STARTUPINFOW startup_info;
+    LPTSTR createprocess_cmdline = NULL;
+    LPTSTR createprocess_env = NULL;
+    LPTSTR createprocess_cwd = NULL;
+    STARTUPINFO startup_info;
     DWORD creation_flags;
     SECURITY_ATTRIBUTES security_attributes;
     HANDLE stdin_pipe[2] = { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE };
@@ -309,7 +317,7 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
     }
 
     if (working_directory) {
-        createprocess_cwd = WIN_UTF8ToStringW(working_directory);
+        createprocess_cwd = WIN_UTF8ToString(working_directory);
         if (!createprocess_cwd) {
             goto done;
         }
@@ -451,7 +459,7 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
         }
     }
 
-    if (!CreateProcessW(NULL, createprocess_cmdline, NULL, NULL, TRUE, creation_flags, createprocess_env, createprocess_cwd, &startup_info, &data->process_information)) {
+    if (!CreateProcess(NULL, createprocess_cmdline, NULL, NULL, TRUE, creation_flags, createprocess_env, createprocess_cwd, &startup_info, &data->process_information)) {
         WIN_SetError("CreateProcess");
         goto done;
     }
