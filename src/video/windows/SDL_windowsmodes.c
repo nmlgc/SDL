@@ -312,6 +312,7 @@ static bool WIN_GetDisplayMode(SDL_VideoDevice *_this, void *dxgi_output, HMONIT
     return true;
 }
 
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 static char *WIN_GetDisplayNameVista(SDL_VideoData *videodata, const TCHAR *deviceName)
 {
     DISPLAYCONFIG_PATH_INFO *paths = NULL;
@@ -390,6 +391,7 @@ WIN_GetDisplayNameVista_failed:
     SDL_free(modes);
     return NULL;
 }
+#endif
 
 #ifdef HAVE_DXGI1_6_H
 static bool WIN_GetMonitorDESC1(HMONITOR hMonitor, DXGI_OUTPUT_DESC1 *desc)
