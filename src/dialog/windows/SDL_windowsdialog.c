@@ -456,6 +456,7 @@ char *clear_filt_names(const char *filt)
     return cleared;
 }
 
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
 bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const char *default_file, SDL_Window *parent, bool allow_many, SDL_DialogFileCallback callback, void *userdata, const char *title, const char *accept, const char *cancel, wchar_t *filter_wchar, int nfilters)
 {
     bool is_save = dialog_type == SDL_FILEDIALOG_SAVEFILE;
@@ -760,6 +761,7 @@ quit:
 
     return success;
 }
+#endif
 
 // TODO: The new version of file dialogs
 void windows_ShowFileDialog(void *ptr)
@@ -779,9 +781,11 @@ void windows_ShowFileDialog(void *ptr)
     wchar_t *filter_wchar = args->filters_str;
     int nfilters = args->nfilters;
 
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
     if (windows_ShowModernFileFolderDialog(is_save ? SDL_FILEDIALOG_SAVEFILE : SDL_FILEDIALOG_OPENFILE, default_file, parent, allow_many, callback, userdata, title, accept, cancel, filter_wchar, nfilters)) {
         return;
     }
+#endif
 
     /* GetOpenFileName and GetSaveFileName have the same signature
        (yes, LPOPENFILENAMEW even for the save dialog) */
@@ -1082,9 +1086,11 @@ void windows_ShowFolderDialog(void *ptr)
     const char *accept = args->accept;
     const char *cancel = args->cancel;
 
+#if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
     if (windows_ShowModernFileFolderDialog(SDL_FILEDIALOG_OPENFOLDER, default_folder, window, allow_many, callback, userdata, title, accept, cancel, NULL, 0)) {
         return;
     }
+#endif
 
     if (window) {
         parent = (HWND) SDL_GetPointerProperty(SDL_GetWindowProperties(window), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
