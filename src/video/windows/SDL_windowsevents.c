@@ -865,7 +865,7 @@ static bool HasDeviceID(Uint32 deviceID, const Uint32 *list, int count)
     return false;
 }
 
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(__WIN9X__)
 static char *GetDeviceName(HANDLE hDevice, HDEVINFO devinfo, const char *instance, const char *default_name, bool hid_loaded)
 {
     char *vendor_name = NULL;
@@ -1092,7 +1092,7 @@ void WIN_CheckKeyboardAndMouseHotplug(SDL_VideoDevice *_this, bool initial_check
 
     SDL_free(raw_devices);
 }
-#endif // !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#endif // !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(__WIN9X__)
 
 // Return true if spurious LCtrl is pressed
 // LCtrl is sent when RAltGR is pressed
@@ -2656,9 +2656,11 @@ void WIN_PumpEvents(SDL_VideoDevice *_this)
         }
     }
 
+#ifndef __WIN9X__
     if (!_this->internal->gameinput_context) {
         WIN_CheckKeyboardAndMouseHotplug(_this, false);
     }
+#endif
 
     WIN_UpdateIMECandidates(_this);
 

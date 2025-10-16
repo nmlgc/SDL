@@ -24,7 +24,7 @@
 
 #include "SDL_windowsvideo.h"
 
-#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES)
+#if !defined(SDL_PLATFORM_XBOXONE) && !defined(SDL_PLATFORM_XBOXSERIES) && !defined(__WIN9X__)
 
 #include "SDL_windowsevents.h"
 
@@ -262,6 +262,6 @@ bool WIN_SetRawKeyboardEnabled(SDL_VideoDevice *_this, bool enabled)
     return SDL_Unsupported();
 }
 
-#endif // !SDL_PLATFORM_XBOXONE && !SDL_PLATFORM_XBOXSERIES
+#endif // !SDL_PLATFORM_XBOXONE && !SDL_PLATFORM_XBOXSERIES && !__WIN9X__
 
 #endif // SDL_VIDEO_DRIVER_WINDOWS
