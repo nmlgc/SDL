@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -292,6 +292,7 @@ static void Blit_XRGB8888_RGB565Altivec(SDL_BlitInfo *info)
     }
 }
 
+#ifdef BROKEN_ALTIVEC_BLITTERS	// This doesn't properly expand to the lower destination bits
 static void Blit_RGB565_32Altivec(SDL_BlitInfo *info)
 {
     int height = info->dst_h;
@@ -370,9 +371,7 @@ static void Blit_RGB565_32Altivec(SDL_BlitInfo *info)
     while (condition) {                                   \
         unsigned sR, sG, sB;                              \
         unsigned short Pixel = *((unsigned short *)src);  \
-        sR = (Pixel >> 8) & 0xf8;                         \
-        sG = (Pixel >> 3) & 0xfc;                         \
-        sB = (Pixel << 3) & 0xf8;                         \
+        RGB_FROM_RGB565(Pixel, sR, sG, sB);               \
         ASSEMBLE_RGBA(dst, 4, dstfmt, sR, sG, sB, alpha); \
         src += 2;                                         \
         dst += 4;                                         \
@@ -508,9 +507,7 @@ static void Blit_RGB555_32Altivec(SDL_BlitInfo *info)
     while (condition) {                                   \
         unsigned sR, sG, sB;                              \
         unsigned short Pixel = *((unsigned short *)src);  \
-        sR = (Pixel >> 7) & 0xf8;                         \
-        sG = (Pixel >> 2) & 0xf8;                         \
-        sB = (Pixel << 3) & 0xf8;                         \
+        RGB_FROM_RGB555(Pixel, sR, sG, sB);               \
         ASSEMBLE_RGBA(dst, 4, dstfmt, sR, sG, sB, alpha); \
         src += 2;                                         \
         dst += 4;                                         \
@@ -567,6 +564,7 @@ static void Blit_RGB555_32Altivec(SDL_BlitInfo *info)
         dst += dstskip;
     }
 }
+#endif // BROKEN_ALTIVEC_BLITTERS
 
 static void BlitNtoNKey(SDL_BlitInfo *info);
 static void BlitNtoNKeyCopyAlpha(SDL_BlitInfo *info);
@@ -2691,7 +2689,7 @@ static void SDL_TARGETING("avx2") Blit8888to8888PixelSwizzleAVX2(SDL_BlitInfo *i
 
 #endif
 
-#if defined(SDL_NEON_INTRINSICS) && (__ARM_ARCH >= 8)
+#if defined(SDL_NEON_INTRINSICS) && (__ARM_ARCH >= 8) && (defined(__aarch64__) || defined(_M_ARM64))
 
 static void Blit8888to8888PixelSwizzleNEON(SDL_BlitInfo *info)
 {
@@ -2969,11 +2967,13 @@ static const struct blit_table normal_blit_1[] = {
 
 static const struct blit_table normal_blit_2[] = {
 #ifdef SDL_ALTIVEC_BLITTERS
+#ifdef BROKEN_ALTIVEC_BLITTERS
     // has-altivec
     { 0x0000F800, 0x000007E0, 0x0000001F, 4, 0x00000000, 0x00000000, 0x00000000,
       BLIT_FEATURE_HAS_ALTIVEC, Blit_RGB565_32Altivec, NO_ALPHA | COPY_ALPHA | SET_ALPHA },
     { 0x00007C00, 0x000003E0, 0x0000001F, 4, 0x00000000, 0x00000000, 0x00000000,
       BLIT_FEATURE_HAS_ALTIVEC, Blit_RGB555_32Altivec, NO_ALPHA | COPY_ALPHA | SET_ALPHA },
+#endif // BROKEN_ALTIVEC_BLITTERS
 #endif
 #ifdef SDL_SSE4_1_INTRINSICS
     { 0x0000F800, 0x000007E0, 0x0000001F, 4, 0x00FF0000, 0x0000FF00, 0x000000FF,
@@ -3117,7 +3117,7 @@ SDL_BlitFunc SDL_CalculateBlitN(SDL_Surface *surface)
                 return Blit8888to8888PixelSwizzleSSE41;
             }
 #endif
-#if defined(SDL_NEON_INTRINSICS) && (__ARM_ARCH >= 8)
+#if defined(SDL_NEON_INTRINSICS) && (__ARM_ARCH >= 8) && (defined(__aarch64__) || defined(_M_ARM64))
             return Blit8888to8888PixelSwizzleNEON;
 #endif
         }

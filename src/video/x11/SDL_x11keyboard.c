@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -183,13 +183,9 @@ bool X11_InitKeyboard(SDL_VideoDevice *_this)
         (void)setlocale(LC_ALL, prev_locale);
         X11_XSetLocaleModifiers(prev_xmods);
 
-        if (prev_locale) {
-            SDL_free(prev_locale);
-        }
+        SDL_free(prev_locale);
 
-        if (prev_xmods) {
-            SDL_free(prev_xmods);
-        }
+        SDL_free(prev_xmods);
     }
 #endif
     // Try to determine which scancodes are being used based on fingerprint
@@ -412,6 +408,7 @@ void X11_UpdateKeymap(SDL_VideoDevice *_this, bool send_event)
             }
         }
 
+        // Only the shift, alt, level 3, level 5 and caps lock modifiers affect SDL keymaps.
         const Uint32 valid_mod_mask = ShiftMask | LockMask | data->keyboard.alt_mask | data->keyboard.level3_mask | data->keyboard.level5_mask;
 
         for (Uint32 xkeycode = data->keyboard.xkb.desc_ptr->min_key_code; xkeycode < data->keyboard.xkb.desc_ptr->max_key_code; ++xkeycode) {

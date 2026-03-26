@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -2642,9 +2642,7 @@ void SetGamepadButtonLabel(GamepadButton *ctx, const char *label)
         return;
     }
 
-    if (ctx->label) {
-        SDL_free(ctx->label);
-    }
+    SDL_free(ctx->label);
 
     ctx->label = SDL_strdup(label);
     ctx->label_width = (float)(FONT_CHARACTER_SIZE * SDL_strlen(label));

@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -56,6 +56,70 @@ typedef struct
     char text[8];
 } SDL_WaylandKeyboardRepeat;
 
+typedef struct SDL_WaylandCursorState
+{
+    SDL_CursorData *current_cursor;
+    struct wp_cursor_shape_device_v1 *cursor_shape;
+    struct wl_surface *surface;
+    struct wp_viewport *viewport;
+
+    double scale;
+
+    // Pointer to the internal data for system cursors.
+    void *system_cursor_handle;
+
+    // The cursor animation thread lock must be held when modifying this.
+    struct wl_callback *frame_callback;
+
+    Uint64 last_frame_callback_time_ms;
+    Uint32 current_frame_time_ms;
+
+    // 0 or greater if a buffer is attached, -1 if in the reset state.
+    int current_frame;
+
+    SDL_HitTestResult hit_test_result;
+} SDL_WaylandCursorState;
+
+typedef struct SDL_WaylandPenTool  // a stylus, etc, on a tablet.
+{
+    SDL_PenID instance_id;
+    SDL_PenInfo info;
+    SDL_WindowData *focus;
+    struct zwp_tablet_tool_v2 *wltool;
+    Uint32 proximity_serial;
+
+    struct
+    {
+        float x;
+        float y;
+
+        float axes[SDL_PEN_AXIS_COUNT];
+        Uint32 axes_set;
+
+        enum
+        {
+            WAYLAND_TABLET_TOOL_BUTTON_NONE = 0,
+            WAYLAND_TABLET_TOOL_BUTTON_DOWN,
+            WAYLAND_TABLET_TOOL_BUTTON_UP
+        } buttons[3];
+
+        enum
+        {
+            WAYLAND_TABLET_TOOL_STATE_NONE = 0,
+            WAYLAND_TABLET_TOOL_STATE_DOWN,
+            WAYLAND_TABLET_TOOL_STATE_UP
+        } tool_state;
+
+        bool in_proximity;
+
+        bool have_motion;
+        bool have_proximity;
+    } frame;
+
+    SDL_WaylandCursorState cursor_state;
+    struct wl_list link;
+} SDL_WaylandPenTool;
+
 typedef struct SDL_WaylandSeat
 {
     SDL_VideoData *display;
@@ -66,7 +130,7 @@ typedef struct SDL_WaylandSeat
     struct wl_list link;
 
     Uint32 last_implicit_grab_serial; // The serial of the last implicit grab event for window activation and selection data.
-    Uint32 registry_id;                        // The ID of the Wayland seat object,
+    Uint32 registry_id;               // The ID of the Wayland seat object,
 
     struct
     {
@@ -120,13 +184,11 @@ typedef struct SDL_WaylandSeat
         struct wl_pointer *wl_pointer;
         struct zwp_relative_pointer_v1 *relative_pointer;
         struct zwp_input_timestamps_v1 *timestamps;
-        struct wp_cursor_shape_device_v1 *cursor_shape;
         struct zwp_locked_pointer_v1 *locked_pointer;
         struct zwp_confined_pointer_v1 *confined_pointer;
         struct zwp_pointer_gesture_pinch_v1 *gesture_pinch;
 
         SDL_WindowData *focus;
-        SDL_CursorData *current_cursor;
 
         // According to the spec, a seat can only have one active gesture of any type at a time.
         SDL_WindowData *gesture_focus;
@@ -145,7 +207,9 @@ typedef struct SDL_WaylandSeat
             bool have_absolute;
             bool have_relative;
             bool have_axis;
-            bool have_enter;
+
+            Uint32 buttons_pressed;
+            Uint32 buttons_released;
 
             struct
             {
@@ -172,23 +236,14 @@ typedef struct SDL_WaylandSeat
                 SDL_MouseWheelDirection direction;
             } axis;
 
+            struct wl_surface *enter_surface;
+            struct wl_surface *leave_surface;
+
             // Event timestamp in nanoseconds
             Uint64 timestamp_ns;
         } pending_frame;
 
-        // Cursor state
-        struct
-        {
-            struct wl_surface *surface;
-            struct wp_viewport *viewport;
-
-            // Animation state for cursors
-            void *cursor_handle;
-            struct wl_callback *frame_callback;
-            Uint64 last_frame_callback_time_ms;
-            Uint32 current_frame_time_ms;
-            int current_frame;
-        } cursor_state;
+        SDL_WaylandCursorState cursor_state;
     } pointer;
 
     struct
@@ -229,10 +284,10 @@ extern void Wayland_DisplayInitTabletManager(SDL_VideoData *display);
 extern void Wayland_DisplayInitDataDeviceManager(SDL_VideoData *display);
 extern void Wayland_DisplayInitPrimarySelectionDeviceManager(SDL_VideoData *display);
 
-extern void Wayland_DisplayCreateTextInputManager(SDL_VideoData *d, uint32_t id);
+extern void Wayland_DisplayInitTextInputManager(SDL_VideoData *d, uint32_t id);
 
 extern void Wayland_DisplayCreateSeat(SDL_VideoData *display, struct wl_seat *wl_seat, Uint32 id);
-extern void Wayland_SeatDestroy(SDL_WaylandSeat *seat, bool send_events);
+extern void Wayland_SeatDestroy(SDL_WaylandSeat *seat, bool shutting_down);
 
 extern void Wayland_SeatUpdatePointerGrab(SDL_WaylandSeat *seat);
 extern void Wayland_DisplayUpdatePointerGrabs(SDL_VideoData *display, SDL_WindowData *window);

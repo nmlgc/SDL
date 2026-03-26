@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -42,6 +42,11 @@
 
 #define RENDERER_CONTEXT_MAJOR 2
 #define RENDERER_CONTEXT_MINOR 1
+
+// This is always the same number between the various EXT/ARB/GLES extensions.
+#ifndef GL_FRAMEBUFFER_SRGB
+#define GL_FRAMEBUFFER_SRGB 0x8DB9
+#endif
 
 // OpenGL renderer implementation
 
@@ -243,7 +248,7 @@ static bool GL_CheckAllErrors(const char *prefix, SDL_Renderer *renderer, const 
 #if 0
 #define GL_CheckError(prefix, renderer)
 #else
-#define GL_CheckError(prefix, renderer) GL_CheckAllErrors(prefix, renderer, SDL_FILE, SDL_LINE, SDL_FUNCTION)
+#define GL_CheckError(prefix, renderer) GL_CheckAllErrors(prefix, renderer, "SDL_render_gl.c", SDL_LINE, SDL_FUNCTION)
 #endif
 
 static bool GL_LoadFunctions(GL_RenderData *data)
@@ -613,9 +618,7 @@ static bool GL_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture, SDL_P
         GL_CheckError("", renderer);
         renderdata->glGenTextures(1, &data->texture);
         if (!GL_CheckError("glGenTextures()", renderer)) {
-            if (data->pixels) {
-                SDL_free(data->pixels);
-            }
+            SDL_free(data->pixels);
             SDL_free(data);
             return false;
         }
@@ -651,8 +654,6 @@ static bool GL_CreateTexture(SDL_Renderer *renderer, SDL_Texture *texture, SDL_P
     data->texture_address_mode_v = SDL_TEXTURE_ADDRESS_CLAMP;
     renderdata->glEnable(textype);
     renderdata->glBindTexture(textype, data->texture);
-    SetTextureScaleMode(renderdata, format, textype, data->texture_scale_mode);
-    SetTextureAddressMode(renderdata, textype, data->texture_address_mode_u, data->texture_address_mode_v);
 #ifdef SDL_PLATFORM_MACOS
 #ifndef GL_TEXTURE_STORAGE_HINT_APPLE
 #define GL_TEXTURE_STORAGE_HINT_APPLE 0x85BC
@@ -1673,6 +1674,7 @@ static void GL_DestroyTexture(SDL_Renderer *renderer, SDL_Texture *texture)
 
     if (renderdata->drawstate.texture == texture) {
         renderdata->drawstate.texture = NULL;
+        renderdata->drawstate.shader_params = NULL;
     }
     if (renderdata->drawstate.target == texture) {
         renderdata->drawstate.target = NULL;
@@ -1762,7 +1764,7 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
 {
     GL_RenderData *data = NULL;
     GLint value;
-    SDL_WindowFlags window_flags;
+    SDL_WindowFlags window_flags = 0;
     int profile_mask = 0, major = 0, minor = 0;
     int real_major = 0, real_minor = 0;
     bool changed_window = false;
@@ -1770,9 +1772,22 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
     bool non_power_of_two_supported = false;
     bool bgra_supported = false;
 
-    SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &profile_mask);
-    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major);
-    SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor);
+    SDL_SetupRendererColorspace(renderer, create_props);
+
+    if (renderer->output_colorspace != SDL_COLORSPACE_SRGB) {
+        SDL_SetError("Unsupported output colorspace");
+        goto error;
+    }
+
+    if (!SDL_GL_GetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, &profile_mask)) {
+        goto error;
+    }
+    if (!SDL_GL_GetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, &major)) {
+        goto error;
+    }
+    if (!SDL_GL_GetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, &minor)) {
+        goto error;
+    }
 
 #ifndef SDL_VIDEO_VITA_PVR_OGL
     SDL_SyncWindow(window);
@@ -1790,13 +1805,6 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
         }
     }
 #endif
-
-    SDL_SetupRendererColorspace(renderer, create_props);
-
-    if (renderer->output_colorspace != SDL_COLORSPACE_SRGB) {
-        SDL_SetError("Unsupported output colorspace");
-        goto error;
-    }
 
     data = (GL_RenderData *)SDL_calloc(1, sizeof(*data));
     if (!data) {
@@ -1835,6 +1843,7 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
 
     renderer->name = GL_RenderDriver.name;
 
+    SDL_GL_SetAttribute(SDL_GL_FRAMEBUFFER_SRGB_CAPABLE, 0);
     data->context = SDL_GL_CreateContext(window);
     if (!data->context) {
         goto error;
@@ -1929,20 +1938,20 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
     }
 
     // RGBA32 is always supported with OpenGL
-    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBA32);
     if (bgra_supported) {
-        SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_BGRA32);
+        SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_BGRA32);    // SDL_PIXELFORMAT_ARGB8888 on little endian systems
     }
+    SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBA32);
 
     // Check for shader support
     data->shaders = GL_CreateShaderContext();
     SDL_LogInfo(SDL_LOG_CATEGORY_RENDER, "OpenGL shaders: %s",
                 data->shaders ? "ENABLED" : "DISABLED");
     if (GL_SupportsShader(data->shaders, SHADER_RGB)) {
-        SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBX32);
         if (bgra_supported) {
             SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_BGRX32);
         }
+        SDL_AddSupportedTextureFormat(renderer, SDL_PIXELFORMAT_RGBX32);
     } else {
         SDL_LogInfo(SDL_LOG_CATEGORY_RENDER, "OpenGL RGB shaders not supported");
     }
@@ -2003,6 +2012,10 @@ static bool GL_CreateRenderer(SDL_Renderer *renderer, SDL_Window *window, SDL_Pr
     } else {
         SDL_SetError("Can't create render targets, GL_EXT_framebuffer_object not available");
         goto error;
+    }
+
+    if ((real_major >= 3) || SDL_GL_ExtensionSupported("GL_EXT_framebuffer_sRGB") || SDL_GL_ExtensionSupported("GL_ARB_framebuffer_sRGB")) {
+        data->glDisable(GL_FRAMEBUFFER_SRGB);
     }
 
     // Set up parameters for rendering

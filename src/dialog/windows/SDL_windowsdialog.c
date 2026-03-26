@@ -1,6 +1,6 @@
 /*
   Simple DirectMedia Layer
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -732,25 +732,17 @@ quit:
     // default_file_w is a pointer into default_folder_w.
     if (default_folder_w) {
         SDL_free(default_folder_w);
-    } else if (default_file_w) {
+    } else {
         SDL_free(default_file_w);
     }
 
-    if (title_w) {
-        SDL_free(title_w);
-    }
+    SDL_free(title_w);
 
-    if (accept_w) {
-        SDL_free(accept_w);
-    }
+    SDL_free(accept_w);
 
-    if (cancel_w) {
-        SDL_free(cancel_w);
-    }
+    SDL_free(cancel_w);
 
-    if (filter_data) {
-        SDL_free(filter_data);
-    }
+    SDL_free(filter_data);
 
     if (files) {
         for (char** files_ptr = files; *files_ptr; files_ptr++) {
@@ -1301,5 +1293,5 @@ void SDL_SYS_ShowFileDialogWithProperties(SDL_FileDialogType type, SDL_DialogFil
     case SDL_FILEDIALOG_OPENFOLDER:
         ShowFolderDialog(callback, userdata, window, default_location, allow_many, title, accept, cancel);
         break;
-    };
+    }
 }

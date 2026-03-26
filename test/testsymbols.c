@@ -1,5 +1,5 @@
 /*
-  Copyright (C) 1997-2025 Sam Lantinga <slouken@libsdl.org>
+  Copyright (C) 1997-2026 Sam Lantinga <slouken@libsdl.org>
 
   This software is provided 'as-is', without any express or implied
   warranty.  In no event will the authors be held liable for any damages
@@ -15,6 +15,7 @@
 #define SDL_DISABLE_ANALYZE_MACROS
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_main.h>
 #include <SDL3/SDL_vulkan.h>
 
 #if !defined(SDL_PLATFORM_ANDROID)
@@ -39,6 +40,8 @@ extern SDL_DECLSPEC void SDLCALL SDL_GDKSuspendGPU(void);
 extern SDL_DECLSPEC void SDLCALL SDL_GDKSuspendComplete(void);
 extern SDL_DECLSPEC void SDLCALL SDL_GetGDKDefaultUser(void);
 extern SDL_DECLSPEC void SDLCALL SDL_GetGDKTaskQueue(void);
+extern SDL_DECLSPEC void SDLCALL SDL_GDKSuspendRenderer(void);
+extern SDL_DECLSPEC void SDLCALL SDL_GDKResumeRenderer(void);
 #endif
 
 #if !defined(SDL_PLATFORM_IOS)
@@ -58,18 +61,16 @@ extern SDL_DECLSPEC void SDLCALL SDL_GetDirect3D9AdapterIndex(void);
 #endif
 
 #if !defined(SDL_PLATFORM_WINDOWS)
+extern SDL_DECLSPEC void SDLCALL SDL_RegisterApp(void);
+extern SDL_DECLSPEC void SDLCALL SDL_UnregisterApp(void);
 extern SDL_DECLSPEC void SDLCALL SDL_SetWindowsMessageHook(void);
 #endif
 
-extern SDL_DECLSPEC void SDLCALL SDL_RegisterApp(void);
-extern SDL_DECLSPEC void SDLCALL SDL_UnregisterApp(void);
-extern SDL_DECLSPEC void SDLCALL SDL_EnterAppMainCallbacks(void);
-extern SDL_DECLSPEC void SDLCALL SDL_RunApp(void);
-extern SDL_DECLSPEC void SDLCALL SDL_SetMainReady(void);
-
 extern SDL_DECLSPEC void SDLCALL JNI_OnLoad(void);
 
-const static struct {
+#include <SDL3/SDL_openxr.h>
+
+static const struct {
     const char *name;
     SDL_FunctionPointer address;
 } sdl_symbols[] = {
