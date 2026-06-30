@@ -25,7 +25,6 @@
 
 #include "../../core/linux/SDL_system_theme.h"
 #include "../../core/linux/SDL_progressbar.h"
-#include "../../core/unix/SDL_gtk.h"
 #include "../../events/SDL_events_c.h"
 
 #include "SDL_waylandclipboard.h"
@@ -71,6 +70,8 @@
 #include "pointer-warp-v1-client-protocol.h"
 #include "pointer-gestures-unstable-v1-client-protocol.h"
 #include "single-pixel-buffer-v1-client-protocol.h"
+#include "xdg-session-management-v1-client-protocol.h"
+#include "xdg-toplevel-tag-v1-client-protocol.h"
 
 #ifdef HAVE_LIBDECOR_H
 #include <libdecor.h>
@@ -733,6 +734,7 @@ static SDL_VideoDevice *Wayland_CreateDevice(bool require_preferred_protocols)
     device->SyncWindow = Wayland_SyncWindow;
     device->SetWindowFocusable = Wayland_SetWindowFocusable;
     device->ReconfigureWindow = Wayland_ReconfigureWindow;
+    device->AcceptDragAndDrop = Wayland_AcceptDragAndDrop;
 
 #ifdef SDL_USE_LIBDBUS
     if (SDL_SystemTheme_Init())
@@ -1326,6 +1328,89 @@ static void Wayland_InitColorManager(SDL_VideoData *d)
     }
 }
 
+static void handle_xdg_session_created(void *data, struct xdg_session_v1 *xdg_session_v1, const char *id)
+{
+    SDL_SetStringProperty(SDL_GetGlobalProperties(), SDL_PROP_GLOBAL_VIDEO_WAYLAND_SESSION_ID_STRING, id);
+}
+
+static void handle_xdg_session_restored(void *data, struct xdg_session_v1 *xdg_session_v1)
+{
+    // NOP
+}
+
+static void handle_xdg_session_replaced(void *data, struct xdg_session_v1 *xdg_session_v1)
+{
+    SDL_VideoDevice *viddev = SDL_GetVideoDevice();
+    SDL_VideoData *viddata = data;
+
+    // Clean up all session objects, as they have become inert, and should be destroyed.
+    SDL_SetStringProperty(SDL_GetGlobalProperties(), SDL_PROP_GLOBAL_VIDEO_WAYLAND_SESSION_ID_STRING, NULL);
+
+    for (SDL_Window *w = viddev->windows; w; w = w->next) {
+        SDL_WindowData *d = w->internal;
+
+        if (d->xdg_toplevel_session) {
+            xdg_toplevel_session_v1_destroy(d->xdg_toplevel_session);
+            d->xdg_toplevel_session = NULL;
+
+            SDL_free(d->session_id);
+            d->session_id = NULL;
+        }
+    }
+
+    if (viddata->xdg_session) {
+        xdg_session_v1_destroy(viddata->xdg_session);
+        viddata->xdg_session = NULL;
+    }
+}
+
+static const struct xdg_session_v1_listener xdg_session_listener = {
+    .created  = handle_xdg_session_created,
+    .restored = handle_xdg_session_restored,
+    .replaced = handle_xdg_session_replaced
+};
+
+void Wayland_CreateSession(SDL_VideoData *viddata)
+{
+    if (!viddata->xdg_session_manager) {
+        // Set the ID string to null if session management is not available.
+        SDL_SetStringProperty(SDL_GetGlobalProperties(), SDL_PROP_GLOBAL_VIDEO_WAYLAND_SESSION_ID_STRING, NULL);
+        return;
+    }
+
+    // Register a new session, if one does not yet exist.
+    if (!viddata->xdg_session) {
+        const char *session_id = SDL_GetStringProperty(SDL_GetGlobalProperties(), SDL_PROP_GLOBAL_VIDEO_WAYLAND_SESSION_ID_STRING, NULL);
+        if (session_id) {
+            if (*session_id == '\0') {
+                // Create a new session if the ID string is empty.
+                session_id = NULL;
+            }
+
+            const enum xdg_session_manager_v1_reason reason = session_id ? XDG_SESSION_MANAGER_V1_REASON_SESSION_RESTORE : XDG_SESSION_MANAGER_V1_REASON_LAUNCH;
+            viddata->xdg_session = xdg_session_manager_v1_get_session(viddata->xdg_session_manager, reason, session_id);
+            xdg_session_v1_add_listener(viddata->xdg_session, &xdg_session_listener, viddata);
+        }
+    }
+}
+
+static void Wayland_SessionDestroy(SDL_VideoData *viddata)
+{
+    // If the session string was cleared, remove the session.
+    if (viddata->xdg_session) {
+        const char *session_id = SDL_GetStringProperty(SDL_GetGlobalProperties(), SDL_PROP_GLOBAL_VIDEO_WAYLAND_SESSION_ID_STRING, NULL);
+        if (!session_id || *session_id == '\0') {
+            xdg_session_v1_remove(viddata->xdg_session);
+
+            WAYLAND_wl_display_roundtrip(viddata->display);
+        } else {
+            xdg_session_v1_destroy(viddata->xdg_session);
+        }
+
+        viddata->xdg_session = NULL;
+    }
+}
+
 static void handle_xdg_wm_base_ping(void *data, struct xdg_wm_base *xdg, uint32_t serial)
 {
     xdg_wm_base_pong(xdg, serial);
@@ -1403,7 +1488,7 @@ static void handle_registry_global(void *data, struct wl_registry *registry, uin
         d->input_timestamps_manager = wl_registry_bind(d->registry, id, &zwp_input_timestamps_manager_v1_interface, 1);
         Wayland_DisplayInitInputTimestampManager(d);
     } else if (SDL_strcmp(interface, wp_cursor_shape_manager_v1_interface.name) == 0) {
-        d->cursor_shape_manager = wl_registry_bind(d->registry, id, &wp_cursor_shape_manager_v1_interface, 1);
+        d->cursor_shape_manager = wl_registry_bind(d->registry, id, &wp_cursor_shape_manager_v1_interface, SDL_min(version, 2));
         Wayland_DisplayInitCursorShapeManager(d);
     } else if (SDL_strcmp(interface, zxdg_exporter_v2_interface.name) == 0) {
         d->zxdg_exporter_v2 = wl_registry_bind(d->registry, id, &zxdg_exporter_v2_interface, 1);
@@ -1425,6 +1510,10 @@ static void handle_registry_global(void *data, struct wl_registry *registry, uin
         Wayland_DisplayInitPointerGestureManager(d);
     } else if (SDL_strcmp(interface, wp_single_pixel_buffer_manager_v1_interface.name) == 0) {
         d->single_pixel_buffer_manager = wl_registry_bind(d->registry, id, &wp_single_pixel_buffer_manager_v1_interface, 1);
+    } else if (SDL_strcmp(interface, xdg_session_manager_v1_interface.name) == 0) {
+        d->xdg_session_manager = wl_registry_bind(d->registry, id, &xdg_session_manager_v1_interface, 1);
+    } else if (SDL_strcmp(interface, xdg_toplevel_tag_manager_v1_interface.name) == 0) {
+        d->xdg_toplevel_tag_manager = wl_registry_bind(d->registry, id, &xdg_toplevel_tag_manager_v1_interface, 1);
     }
 #ifdef SDL_WL_FIXES_VERSION
     else if (SDL_strcmp(interface, wl_fixes_interface.name) == 0) {
@@ -1503,6 +1592,69 @@ static int SDLCALL LibdecorNewInThread(void *data)
 }
 #endif
 
+#ifndef HAVE_GETRESUID
+// Non-POSIX, but Linux and some BSDs have it.
+// To reduce the number of code paths, if getresuid() isn't available at
+// compile-time, we behave as though it existed but failed at runtime.
+static inline int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid) {
+    errno = ENOSYS;
+    return -1;
+}
+#endif
+
+#ifndef HAVE_GETRESGID
+// Same as getresuid() but for the primary group
+static inline int getresgid(uid_t *ruid, uid_t *euid, uid_t *suid) {
+    errno = ENOSYS;
+    return -1;
+}
+#endif
+
+bool CanUseGtk(void)
+{
+    // "Real", "effective" and "saved" IDs: see e.g. Linux credentials(7)
+    uid_t ruid = -1, euid = -1, suid = -1;
+    gid_t rgid = -1, egid = -1, sgid = -1;
+
+    if (!SDL_GetHintBoolean("SDL_ENABLE_GTK", true)) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_SYSTEM, "Not using GTK due to hint");
+        return false;
+    }
+
+    // This is intended to match the check in gtkmain.c, rather than being
+    // an exhaustive check for having elevated privileges: as a result
+    // we don't use Linux getauxval() or prctl PR_GET_DUMPABLE,
+    // BSD issetugid(), or similar OS-specific detection
+
+    if (getresuid(&ruid, &euid, &suid) != 0) {
+        ruid = suid = getuid();
+        euid = geteuid();
+    }
+
+    if (getresgid(&rgid, &egid, &sgid) != 0) {
+        rgid = sgid = getgid();
+        egid = getegid();
+    }
+
+    // Real ID != effective ID means we are setuid or setgid:
+    // GTK will refuse to initialize, and instead will call exit().
+    if (ruid != euid || rgid != egid) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_SYSTEM, "Not using GTK due to setuid/setgid");
+        return false;
+    }
+
+    // Real ID != saved ID means we are setuid or setgid, we previously
+    // dropped privileges, but we can regain them; this protects against
+    // accidents but does not protect against arbitrary code execution.
+    // Again, GTK will refuse to initialize if this is the case.
+    if (ruid != suid || rgid != sgid) {
+        SDL_LogDebug(SDL_LOG_CATEGORY_SYSTEM, "Not using GTK due to saved uid/gid");
+        return false;
+    }
+
+    return true;
+}
+
 bool Wayland_LoadLibdecor(SDL_VideoData *data, bool ignore_xdg)
 {
 #ifdef HAVE_LIBDECOR_H
@@ -1510,7 +1662,7 @@ bool Wayland_LoadLibdecor(SDL_VideoData *data, bool ignore_xdg)
         return true; // Already loaded!
     }
     if (should_use_libdecor(data, ignore_xdg)) {
-        if (SDL_CanUseGtk()) {
+        if (CanUseGtk()) {
             LibdecorNew(data);
         } else {
             // Intentionally initialize libdecor in a non-main thread
@@ -1621,6 +1773,8 @@ static void Wayland_VideoCleanup(SDL_VideoDevice *_this)
 {
     SDL_VideoData *data = _this->internal;
     SDL_WaylandSeat *seat, *tmp;
+
+    Wayland_SessionDestroy(data);
 
     for (int i = _this->num_displays - 1; i >= 0; --i) {
         SDL_VideoDisplay *display = _this->displays[i];
@@ -1777,6 +1931,16 @@ static void Wayland_VideoCleanup(SDL_VideoDevice *_this)
     if (data->single_pixel_buffer_manager) {
         wp_single_pixel_buffer_manager_v1_destroy(data->single_pixel_buffer_manager);
         data->single_pixel_buffer_manager = NULL;
+    }
+
+    if (data->xdg_session_manager) {
+        xdg_session_manager_v1_destroy(data->xdg_session_manager);
+        data->xdg_session_manager = NULL;
+    }
+
+    if (data->xdg_toplevel_tag_manager) {
+        xdg_toplevel_tag_manager_v1_destroy(data->xdg_toplevel_tag_manager);
+        data->xdg_toplevel_tag_manager = NULL;
     }
 
     if (data->subcompositor) {

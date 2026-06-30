@@ -457,6 +457,9 @@ char *clear_filt_names(const char *filt)
 }
 
 #if (_WIN32_WINNT >= _WIN32_WINNT_VISTA)
+// This function returns NOT success or error, but rather whether the callback
+// was invoked or not (and if it was, no fallback should be attempted to prevent
+// calling the callback twice). See https://github.com/libsdl-org/SDL/issues/15194
 bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const char *default_file, SDL_Window *parent, bool allow_many, SDL_DialogFileCallback callback, void *userdata, const char *title, const char *accept, const char *cancel, wchar_t *filter_wchar, int nfilters)
 {
     bool is_save = dialog_type == SDL_FILEDIALOG_SAVEFILE;
@@ -489,7 +492,8 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
     wchar_t *default_file_w = NULL;
     wchar_t *default_folder_w = NULL;
 
-    bool success = false;
+    bool callback_called = false;
+    bool call_callback_on_error = false;
     bool co_init = false;
 
     // We can assume shell32 is already loaded here.
@@ -605,6 +609,10 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
         CHECK(pFileDialog->lpVtbl->SetFileName(pFileDialog, default_file_w));
     }
 
+    // Right after this, a dialog is shown. No fallback should be attempted on
+    // error to prevent showing two dialogs to the user.
+    call_callback_on_error = true;
+
     if (parent) {
         HWND window = (HWND) SDL_GetPointerProperty(SDL_GetWindowProperties(parent), SDL_PROP_WINDOW_WIN32_HWND_POINTER, NULL);
 
@@ -617,7 +625,7 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
             // This is a one-based index, not zero-based. Doc link in similar comment below
             CHECK(pFileDialog->lpVtbl->GetFileTypeIndex(pFileDialog, &selected_filter));
             callback(userdata, results, selected_filter - 1);
-            success = true;
+            callback_called = true;
             goto quit;
         } else if (!SUCCEEDED(hr)) {
             goto quit;
@@ -632,7 +640,7 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
             // This is a one-based index, not zero-based. Doc link in similar comment below
             CHECK(pFileDialog->lpVtbl->GetFileTypeIndex(pFileDialog, &selected_filter));
             callback(userdata, results, selected_filter - 1);
-            success = true;
+            callback_called = true;
             goto quit;
         } else if (!SUCCEEDED(hr)) {
             goto quit;
@@ -666,7 +674,7 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
         }
 
         callback(userdata, (const char * const *) files, selected_filter - 1);
-        success = true;
+        callback_called = true;
     } else {
         // This is a one-based index, not zero-based.
         // https://learn.microsoft.com/en-us/windows/win32/api/shobjidl_core/nf-shobjidl_core-ifiledialog-getfiletypeindex#parameters
@@ -682,18 +690,17 @@ bool windows_ShowModernFileFolderDialog(SDL_FileDialogType dialog_type, const ch
         }
         const char * const results[] = { file, NULL };
         callback(userdata, results, selected_filter - 1);
-        success = true;
+        callback_called = true;
         SDL_free(file);
     }
-
-    success = true;
 
 #undef CHECK
 
 quit:
-    if (!success) {
-        WIN_SetError("dialogg");
+    if (!callback_called && call_callback_on_error) {
+        WIN_SetError("dialog");
         callback(userdata, NULL, -1);
+        callback_called = true;
     }
 
     if (co_init) {
@@ -751,7 +758,7 @@ quit:
         SDL_free(files);
     }
 
-    return success;
+    return callback_called;
 }
 #endif
 
@@ -1032,7 +1039,7 @@ void windows_ShowFileDialog(void *ptr)
             const char *opts[1] = { NULL };
             callback(userdata, opts, getFilterIndex(dialog.nFilterIndex));
         } else {
-            SDL_SetError("Windows error, CommDlgExtendedError: %ld", pCommDlgExtendedError());
+            SDL_SetError("Windows error, CommDlgExtendedError: %" SDL_PRIuULONG, pCommDlgExtendedError());
             callback(userdata, NULL, -1);
         }
     }
@@ -1142,7 +1149,7 @@ wchar_t *win_get_filters(const SDL_DialogFileFilter *filters, int nfilters)
         // suffix needs two null bytes in case the filter list is empty
         char *filterlist = convert_filters(filters, nfilters, clear_filt_names,
                                            "", "", "\x01\x01", "", "\x01",
-                                           "\x01", "*.", ";*.", "");
+                                           "\x01", "*.", ";*.", "", false);
 
         if (!filterlist) {
             return NULL;

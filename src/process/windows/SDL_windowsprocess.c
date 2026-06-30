@@ -271,6 +271,7 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
     HANDLE stdin_pipe[2] = { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE };
     HANDLE stdout_pipe[2] = { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE };
     HANDLE stderr_pipe[2] = { INVALID_HANDLE_VALUE, INVALID_HANDLE_VALUE };
+    HANDLE handle;
     DWORD pipe_mode = PIPE_NOWAIT;
     bool result = false;
 
@@ -365,7 +366,10 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
         break;
     case SDL_PROCESS_STDIO_INHERITED:
     default:
-        if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(STD_INPUT_HANDLE),
+        handle = GetStdHandle(STD_INPUT_HANDLE);
+        if (!handle) {
+            startup_info.hStdInput = NULL;
+        } else if (!DuplicateHandle(GetCurrentProcess(), handle,
                              GetCurrentProcess(), &startup_info.hStdInput,
                              0, TRUE, DUPLICATE_SAME_ACCESS)) {
             startup_info.hStdInput = INVALID_HANDLE_VALUE;
@@ -402,7 +406,10 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
         break;
     case SDL_PROCESS_STDIO_INHERITED:
     default:
-        if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(STD_OUTPUT_HANDLE),
+        handle = GetStdHandle(STD_OUTPUT_HANDLE);
+        if (!handle) {
+            startup_info.hStdOutput = NULL;
+        } else if (!DuplicateHandle(GetCurrentProcess(), handle,
                              GetCurrentProcess(), &startup_info.hStdOutput,
                              0, TRUE, DUPLICATE_SAME_ACCESS)) {
             startup_info.hStdOutput = INVALID_HANDLE_VALUE;
@@ -413,7 +420,10 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
     }
 
     if (redirect_stderr) {
-        if (!DuplicateHandle(GetCurrentProcess(), startup_info.hStdOutput,
+        handle = startup_info.hStdOutput;
+        if (!handle) {
+            startup_info.hStdError = NULL;
+        } else if (!DuplicateHandle(GetCurrentProcess(), handle,
                              GetCurrentProcess(), &startup_info.hStdError,
                              0, TRUE, DUPLICATE_SAME_ACCESS)) {
             startup_info.hStdError = INVALID_HANDLE_VALUE;
@@ -448,7 +458,10 @@ bool SDL_SYS_CreateProcessWithProperties(SDL_Process *process, SDL_PropertiesID 
             break;
         case SDL_PROCESS_STDIO_INHERITED:
         default:
-            if (!DuplicateHandle(GetCurrentProcess(), GetStdHandle(STD_ERROR_HANDLE),
+            handle = GetStdHandle(STD_ERROR_HANDLE);
+            if (!handle) {
+                startup_info.hStdError = NULL;
+            } else if (!DuplicateHandle(GetCurrentProcess(), handle,
                                  GetCurrentProcess(), &startup_info.hStdError,
                                  0, TRUE, DUPLICATE_SAME_ACCESS)) {
                 startup_info.hStdError = INVALID_HANDLE_VALUE;

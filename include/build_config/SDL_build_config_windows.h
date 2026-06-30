@@ -248,7 +248,9 @@ typedef unsigned int uintptr_t;
 #ifdef HAVE_WINDOWS_GAMING_INPUT_H
 #define SDL_JOYSTICK_WGI 1
 #endif
+#if (_WIN32_WINNT >= 0x0501)  /* Windows XP SDK */
 #define SDL_JOYSTICK_XINPUT 1
+#endif
 #define SDL_HAPTIC_DINPUT 1
 
 /* Enable various process implementations */

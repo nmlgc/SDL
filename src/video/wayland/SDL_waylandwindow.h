@@ -118,6 +118,7 @@ struct SDL_WindowData
     struct xdg_toplevel_icon_v1 *xdg_toplevel_icon_v1;
     struct frog_color_managed_surface *frog_color_managed_surface;
     struct wp_color_management_surface_feedback_v1 *wp_color_management_surface_feedback;
+    struct xdg_toplevel_session_v1 *xdg_toplevel_session;
 
     struct Wayland_ColorInfoState *color_info_state;
 
@@ -127,6 +128,7 @@ struct SDL_WindowData
     int num_outputs;
 
     char *app_id;
+    char *session_id;
     double scale_factor;
 
     struct wl_buffer **icon_buffers;
@@ -234,6 +236,7 @@ struct SDL_WindowData
     bool scale_to_display;
     bool reparenting_required;
     bool double_buffer;
+    bool accepts_drag_and_drop;
 
     SDL_HitTestResult hit_test_result;
 
@@ -271,6 +274,7 @@ extern bool Wayland_SetWindowIcon(SDL_VideoDevice *_this, SDL_Window *window, SD
 extern bool Wayland_SetWindowFocusable(SDL_VideoDevice *_this, SDL_Window *window, bool focusable);
 extern float Wayland_GetWindowContentScale(SDL_VideoDevice *_this, SDL_Window *window);
 extern void *Wayland_GetWindowICCProfile(SDL_VideoDevice *_this, SDL_Window *window, size_t *size);
+extern void Wayland_AcceptDragAndDrop(SDL_Window *window, bool accept);
 
 extern bool Wayland_SetWindowHitTest(SDL_Window *window, bool enabled);
 extern bool Wayland_FlashWindow(SDL_VideoDevice *_this, SDL_Window *window, SDL_FlashOperation operation);
