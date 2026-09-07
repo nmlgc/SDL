@@ -112,7 +112,7 @@ typedef unsigned int uintptr_t;
 #if (_WIN32_WINNT >= 0x0601)  /* Windows 7 SDK */
 #define HAVE_SENSORSAPI_H 1
 #endif
-#if (_WIN32_WINNT >= 0x0A00) && defined(__has_include) && __has_include(<gameinput.h>)
+#if (_WIN32_WINNT >= 0x0A00)
 #define HAVE_GAMEINPUT_H 1
 #endif
 #if (defined(_M_IX86) || defined(_M_X64) || defined(_M_AMD64)) && (defined(_MSC_VER) && _MSC_VER >= 1600)
